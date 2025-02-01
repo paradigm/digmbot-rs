@@ -36,32 +36,21 @@ You can use services provided by LLM vendors such as OpenAI and Anthropic, or se
 
 Create a basic json file at `~/.config/digmbot/llm_settings.json` (on Linux) or the equivalent (on other platforms) with the following json keys:
 
-- `completion_url`: The URL of a OpenAI-derived standard LLM completion point such as an ollama instance.
+- `completion_url`: The URL of a OpenAI-derived standard LLM generation/completion endpoint.
+- `chat_url`: The URL of a OpenAI-derived standard LLM chat endpoint
 - `model_name`: The name of the model you'd like to run on the completion endpoint.
 - `system`: The system prompt.  This instructs the LLM on how to behave.  Optionally, you may include a `{}` within the prompt and the bot will replace it with the bot's name as provided by Discord.
 - `context_size`: How many tokens worth of context to the LLM will use.  This determines things like the amount of channel history the bot "backreads" before generating its response.
-- Text which provides structure to the LLM's prompt.  For most major public models, you'll find these in the LLM model's documentation.
-    - `system_msg_start`: Text to place before the system prompt.
-    - `system_msg_end`: Text to place after the system prompt.
-    - `user_msg_start`: Text to place before a message from the users in the Discord channel
-    - `user_msg_end`: Text to place after a message from the users in the Discord channel
-    - `bot_msg_start`: Text to place before a message from the bot in the Discord channel
-    - `bot_msg_end`: Text to place after a message from the bot in the Discord channel
 
 For example:
 
 ```
 {
-	"completion_url": "http://example.com:11434/api/generate",
+	"completion_url": "http://127.0.0.1:11434/api/generate",
+	"chat_url": "http://127.0.0.1:11434/api/chat",
 	"model_name": "example",
 	"system": "You are {}, a Discord bot.  You creatively segue any discussion topic to your enjoyment of working with the Rust programming language.",
 	"context_size": 8192,
-	"system_msg_start": "<|start_header_id|>system\n",
-	"system_msg_end": "<|end_header_id|>",
-	"user_msg_start": "<|start_header_id|>user\n",
-	"user_msg_end": "<|end_header_id|>",
-	"bot_msg_start": "<|start_header_id|>assistant\n",
-	"bot_msg_end": "<|end_header_id|>"
 }
 ```
 
@@ -111,7 +100,6 @@ src
     - Bot owner whitelist configuration
     - Explicitly support non-Linux platforms, making code changes if necessary, and updating this `README.md` accordingly
 - LLM tech
-    - Rather than requiring users configure LLM special tokens, the LLM completion API call should use the `messages` feature to provide the message history with corresponding roles.  [See ollama's documentation](https://ollama.com/blog/openai-compatibility).  This should both simplify the user-facing configuration and code base.
     - Refactor out the LLM completion logic into its own module that the LLM plugin calls such that we can use LLMs for other plugins/features.
     - Dynamically calculate exact number of room history messages to put into the model's context based on context size configuration
     - Implement LLM function calling such that the bot can do things like list available channels, users, and create messages.  Consider, for example, a reminder system.

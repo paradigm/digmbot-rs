@@ -11,25 +11,69 @@ use std::io::ErrorKind;
 /// Queries an LLM for a response
 pub struct PluginLlm;
 
-#[derive(serde::Serialize)]
-struct LlmCompletionRequest {
-    // LLM model name
-    model: String,
-    // System prompt
+#[derive(serde::Deserialize, Default, Clone)]
+struct LlmSettings {
+    completion_url: String,
+    chat_url: String,
+    model_name: String,
     system: String,
-    // Whether to stream one token at a time, or return entire response is one go
+    context_size: usize,
+}
+
+// Non-chat completion, e.g inline code completion
+//
+// #[derive(serde::Serialize)]
+// struct LlmCompletionRequest {
+//     /// LLM model name
+//     model: String,
+//     /// System prompt
+//     system: String,
+//     /// Whether to stream one token at a time, or return entire response is one go
+//     stream: bool,
+//     /// Start of text for which the bot should generation further text.
+//     prompt: String,
+//     /// Context size
+//     num_ctx: usize,
+//     /// LLM temperature
+//     temperature: f32,
+// }
+//
+// #[derive(serde::Deserialize)]
+// struct LlmCompletionResponse {
+//     response: String,
+// }
+
+#[derive(serde::Serialize)]
+struct LlmChatRequest {
+    /// LLM model name
+    model: String,
+    /// Whether to stream one token at a time, or return entire response is one go
     stream: bool,
-    // Text to complete.
-    prompt: String,
-    // Context size
+    /// Chat conversation to continue.  Use this for completing chat history.
+    messages: Vec<ChatMessage>,
+    /// Context size
     num_ctx: usize,
-    // LLM temperature
+    /// LLM temperature
     temperature: f32,
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
+struct ChatMessage {
+    role: ChatMessageRole,
+    content: String,
+}
+
+#[allow(non_camel_case_types)] // Serialized literally; case matters
+#[derive(serde::Serialize, serde::Deserialize)]
+enum ChatMessageRole {
+    system,
+    user,
+    assistant,
+}
+
 #[derive(serde::Deserialize)]
-struct LlmCompletionResponse {
-    response: String,
+struct LlmChatResponse {
+    message: ChatMessage,
 }
 
 #[serenity::async_trait]
@@ -47,6 +91,8 @@ impl Plugin for PluginLlm {
 
         if let Some(settings) = settings {
             ctx.data.write().await.insert::<LlmSettings>(settings);
+        } else {
+            println!("+ No (valid) llm_settings.json found, disabling LLM subsystem");
         }
 
         Ok(())
@@ -70,8 +116,11 @@ impl Plugin for PluginLlm {
         // Interpret scenario where llm settings are not configured as opting out of this plugin
         let state = ctx.data.read().await;
         let Some(settings) = state.get::<LlmSettings>().cloned() else {
+            println!("+ No (valid) llm_settings.json found, skipping LLM response");
             return Ok(EventHandled::No);
         };
+        // Make sure to drop this read-lock on global state before we perform a following
+        // write-lock lest we deadlock.
         drop(state);
 
         // All the checks to see if we want to make an LLM completion request have passed.  Since
@@ -85,17 +134,12 @@ impl Plugin for PluginLlm {
             .get_mut::<History>()
             .ok_or(anyhow!("History uninitialized"))?;
         let history = history.get(ctx, msg.channel_id).await?.clone();
-        drop(state);
 
         let bot_id = ctx.cache.current_user().id;
-        let bot_name = ctx.cache.current_user().display_name().to_owned();
-        let response = LlmCompletionRequest::new(&settings, &history, bot_id, &bot_name)
+        let response = LlmChatRequest::new(&settings, &history, bot_id)
             .await?
-            .post(&settings.completion_url)
+            .post(&settings.chat_url)
             .await?;
-
-        // TODO: split messages longer than the discord max of 2000 characters into multiple
-        // messages.  Put some time between them to avoid Discord thinking of it as spam.
 
         typing.stop();
         msg.reply(ctx, &response).await?;
@@ -104,91 +148,68 @@ impl Plugin for PluginLlm {
     }
 }
 
-impl LlmCompletionRequest {
-    async fn new(
-        settings: &LlmSettings,
-        history: &[HistoryEntry],
-        bot_id: UserId,
-        bot_name: &str,
-    ) -> Result<Self> {
-        // The llm runner will add these implicitly.  However, we still want to calculate them for
-        // the context length overhead.
-        let system = format!(
-            "{}{}{}",
-            settings.system_msg_start, settings.system, settings.system_msg_end
-        );
-        let bot_opening = format!("{}{}: ", settings.bot_msg_start, bot_name);
+impl LlmChatRequest {
+    async fn new(settings: &LlmSettings, history: &[HistoryEntry], bot_id: UserId) -> Result<Self> {
+        // Start with a system message.
+        let mut messages = Vec::new();
+        messages.push(ChatMessage {
+            role: ChatMessageRole::system,
+            content: settings.system.clone(),
+        });
 
-        // Convert history into llm format with turn-taking tokens
-        //
-        // Go through in reverse, checking that we fit within context before adding
-        // older item.
-        let mut body = String::new();
-        for HistoryEntry {
-            author_id,
-            content,
-            human_format,
-        } in history.iter().rev()
-        {
-            let (msg_start, msg_end) = if *author_id == bot_id {
-                (&settings.bot_msg_start, &settings.bot_msg_end)
+        // Use reverse order so that we can stop adding if the accumulated content gets too long.
+        let mut total_len = settings.system.len();
+        let mut history_messages = Vec::new();
+        // Iterate from the most recent to the oldest.
+        for entry in history.iter().rev() {
+            let role = if entry.author_id == bot_id {
+                ChatMessageRole::assistant
             } else {
-                (&settings.user_msg_start, &settings.user_msg_end)
+                ChatMessageRole::user
             };
-
-            let new_msg = format!("{}{}{}", msg_start, human_format, msg_end);
-
-            if system.len() + body.len() + new_msg.len() + bot_opening.len() > settings.context_size
-            {
+            let content = entry.human_format.clone();
+            total_len += content.len();
+            // Use content length as a crude estimate of tokens.
+            if total_len / 3 > settings.context_size {
                 break;
             }
-            body.insert_str(0, &new_msg);
+            history_messages.push(ChatMessage { role, content });
         }
 
-        let prompt = format!("{}{}", body, bot_opening);
+        // Reverse back to chronological order.
+        history_messages.reverse();
+        messages.extend(history_messages);
 
         Ok(Self {
             model: settings.model_name.clone(),
-            system: settings.system.clone(),
+            messages,
             stream: false,
-            prompt,
+            temperature: 0.8, // TODO: make configurable?
             num_ctx: settings.context_size,
-            temperature: 0.8,
         })
     }
 
     async fn post(&self, url: &str) -> Result<String> {
-        print!("Querying LLM server... ");
+        println!("+ Querying chat endpoint {}... ", url);
         let client = reqwest::Client::new();
         let response = client
             .post(url)
-            .json(&self)
+            .json(self)
             .send()
             .await?
-            .json::<LlmCompletionResponse>()
+            .json::<LlmChatResponse>()
             .await?;
-        println!("done");
+        println!("+ Querying chat endpoint {}... done", url);
+        let response_content = response.message.content;
 
-        if response.response.len() >= 1900 {
+        // TODO: split messages longer than the discord max of 2000 characters into multiple
+        // messages.  Put some time between them to avoid Discord thinking of it as spam.
+        if response_content.len() >= 1900 {
             return Ok("I blabbed too long and my message was longer than the discord post limit and paradigm didn't implement a solution to cut a post up into multiple messages".to_string());
         }
 
-        Ok(response.response)
+        Ok(response_content)
     }
-}
-
-#[derive(serde::Deserialize, Default, Clone)]
-struct LlmSettings {
-    completion_url: String,
-    model_name: String,
-    system: String,
-    context_size: usize,
-    system_msg_start: String,
-    system_msg_end: String,
-    user_msg_start: String,
-    user_msg_end: String,
-    bot_msg_start: String,
-    bot_msg_end: String,
 }
 
 // Serenity crate system to support this type in the Serenity Context
