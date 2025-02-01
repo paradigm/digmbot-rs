@@ -10,21 +10,44 @@ As this code base is intended more as a experimentation platform rather than a p
 
 ### Compilation and Installation
 
+Clone the source code:
+
 ```
 git clone https://github.com/paradigm/digmbot-rs
 cd digmbot-rs
-cargo build --release
-cp ./target/release/digmbot /path/to/install/location
 ```
+
+To build without full optimizations (which builds faster and expedites development):
+
+```
+cargo build
+```
+
+To build with full optimizations (for production release):
+
+```
+cargo build --release
+```
+
+To (build and) run a non-release build:
+
+```
+cargo run
+```
+
+To (build and) run the production build:
+
+```
+cargo run --release
+```
+
+To install digmbot somewhere, copy the release build from `./target/release/digmbot` to the target location.  From there you can just execute the binary.
 
 ### Discord token
 
 To have digmbot connect to a Discord server, you'll need a discord bot token.
 
-- Login to discord.com and go to [the developer application page](https://discord.com/developers/applications/).
-- Click "New Application" in the corner and follow the prompts to create a Discord application.
-- Within the application, look for "Bot" and follow the prompts to create a bot for the application.
-- Under the application's bots section, click on "Click to Reveal Token" to acquire the token string.
+- [Follow a guide to get a Discord bot token](https://www.writebots.com/discord-bot-token/)
 - Place token string within a file at `~/.config/digmbot/discord_token` (on Linux) or the equivalent (on other platforms)
 - Optionally, add the bot to a Discord server.  Alternatively, just DM with it.
 
