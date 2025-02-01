@@ -1,0 +1,19 @@
+[package]
+name = "digmbot"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# error handling
+anyhow = "1.0"
+# discord API
+serenity = "0.12.4"
+# async framework needed by serenity
+tokio = { version = "1.21.2", features = ["macros", "rt-multi-thread"] }
+# Serialize/deserialize various data formats, e.g. JSON
+serde = "1.0"
+serde_json = "1.0"
+# Standard directory paths for various operating systems
+dirs = "5.0"
+# http requests
+reqwest = { version = "0.11.24", features = ["json"] }
