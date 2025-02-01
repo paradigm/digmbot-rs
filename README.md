@@ -99,6 +99,8 @@ src
 - Configuration
     - Bot owner whitelist configuration
     - Explicitly support non-Linux platforms, making code changes if necessary, and updating this `README.md` accordingly
+- Discord
+    - LLM plugin generated responses may be over Discord message length (2k characters); if so, split into multiple messages.
 - LLM tech
     - Refactor out the LLM completion logic into its own module that the LLM plugin calls such that we can use LLMs for other plugins/features.
     - Dynamically calculate exact number of room history messages to put into the model's context based on context size configuration
