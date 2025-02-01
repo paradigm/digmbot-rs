@@ -62,7 +62,9 @@ impl Event {
         if let Event::Ready { ctx, ready } = &self {
             // Serenity crate ctx is ready to be used.  Initialize plugin states.
             for plugin in crate::plugin::plugins() {
-                plugin.init(ctx).await;
+                if let Err(e) = plugin.init(ctx).await {
+                    println!("Error initializing {} plugin: {}\n", plugin.name(), e);
+                }
             }
         }
 

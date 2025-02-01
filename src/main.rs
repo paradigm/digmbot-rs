@@ -1,6 +1,7 @@
 #![allow(unused)]
 
 use crate::helper::PathHelper;
+use anyhow::anyhow;
 
 mod event;
 mod helper;
@@ -13,7 +14,8 @@ use serenity::prelude::{Client, GatewayIntents};
 async fn main() -> Result<()> {
     let token = helper::config_path("discord_token")?
         .read_to_string()
-        .await?;
+        .await
+        .map_err(|e| anyhow!("Error reading discord_token: {}", e))?;
 
     // Things we want discord to tell us about.
     let intents = GatewayIntents::DIRECT_MESSAGES

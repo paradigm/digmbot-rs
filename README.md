@@ -91,6 +91,7 @@ src
     - `plugin/mod.rs` has a `plugins()` function which lists enabled plugins.  Add any new plugin to it, or comment/remove any which you'd like to disable.
 - Configuration should be stored in `~/.config/digmbot/` on Linux or the equivalent on other platforms.
 - Convention is for special commands to be prefixed with a semicolon.
+- Debug convention is for `*`-prefixed messages to indicate an event, `+`-prefixed messages to indicate an internal action
 
 ### Feature submission ideas
 

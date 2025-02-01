@@ -83,6 +83,12 @@ impl History {
         match self.0.entry(channel_id) {
             std::collections::hash_map::Entry::Occupied(o) => Ok(o.into_mut()),
             std::collections::hash_map::Entry::Vacant(v) => {
+                let channel_name = channel_id
+                    .name(&ctx.http)
+                    .await
+                    .unwrap_or("<unknown-room>".to_owned());
+                println!("+ Backfilling \"{}\" history... ", channel_name);
+
                 // Backfill
                 // Ignore errors here.  May be serenity crate bug?
                 let mut backfill_messages = channel_id
@@ -104,6 +110,7 @@ impl History {
                     messages.push(entry);
                 }
 
+                println!("+ Backfilling \"{}\" history... done", channel_name);
                 Ok(v.insert(messages))
             }
         }
