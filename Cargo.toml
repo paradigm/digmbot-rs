@@ -17,3 +17,5 @@ serde_json = "1.0"
 dirs = "5.0"
 # http requests
 reqwest = { version = "0.11.24", features = ["json"] }
+# paste tokens in macros
+paste = "1.0.14"

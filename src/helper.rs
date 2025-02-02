@@ -5,38 +5,13 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[serenity::async_trait]
 pub trait MessageHelper {
-    fn guild_name(&self, ctx: &Context) -> String;
-    async fn channel_name(&self, ctx: &Context) -> String;
-    fn author_name(&self, ctx: &Context) -> &str;
-    async fn human_format(&self, ctx: &Context) -> String;
+    async fn human_format_content(&self, ctx: &Context) -> String;
     async fn is_to_me(&self, ctx: &Context) -> Result<bool>;
 }
 
 #[serenity::async_trait]
 impl MessageHelper for serenity::all::Message {
-    fn guild_name(&self, ctx: &Context) -> String {
-        if self.guild_id.is_none() {
-            "DirectMessage".to_string()
-        } else if let Some(guild) = self.guild(&ctx.cache) {
-            guild.name.clone()
-        } else {
-            "<unknown-guild>".to_string()
-        }
-    }
-
-    async fn channel_name(&self, ctx: &Context) -> String {
-        self.channel_id
-            .name(&ctx.http)
-            .await
-            .unwrap_or_else(|_| "<unknown-channel>".into())
-    }
-
-    fn author_name(&self, _ctx: &Context) -> &str {
-        self.author.display_name()
-    }
-
-    async fn human_format(&self, ctx: &Context) -> String {
-        let author_name = self.author_name(ctx);
+    async fn human_format_content(&self, ctx: &Context) -> String {
         // Serenity provides a message.content_safe() method which uses global discord names rather
         // than per-server names.  Thus, we're just reimplementing the logic here with the
         // preferred name.
@@ -92,7 +67,7 @@ impl MessageHelper for serenity::all::Message {
             content = content.replace(&mention, &name);
         }
 
-        format!("{}: {}", author_name, content)
+        content
     }
 
     async fn is_to_me(&self, ctx: &Context) -> Result<bool> {
@@ -145,24 +120,6 @@ impl UserIdHelper for serenity::all::UserId {
         };
 
         user.display_name().to_owned()
-    }
-}
-
-#[serenity::async_trait]
-pub trait VoiceStateHelper {
-    async fn channel_name(&self, ctx: &Context) -> String;
-}
-
-#[serenity::async_trait]
-impl VoiceStateHelper for serenity::all::VoiceState {
-    async fn channel_name(&self, ctx: &Context) -> String {
-        let Some(id) = self.channel_id else {
-            return "<unknown-channel>".to_owned();
-        };
-
-        id.name(&ctx.http)
-            .await
-            .unwrap_or_else(|_| "<unknown-channel>".into())
     }
 }
 

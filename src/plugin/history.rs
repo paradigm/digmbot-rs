@@ -1,4 +1,4 @@
-use crate::{event::*, helper::MessageHelper, plugin::*};
+use crate::{event::*, helper::MessageHelper, log_internal, logging::*, plugin::*};
 use anyhow::{anyhow, Result};
 use serenity::{
     all::{ChannelId, Message, UserId},
@@ -8,7 +8,8 @@ use serenity::{
 use std::collections::HashMap;
 
 /// How many messages the bot should backfill when it first sees a channel.
-const BACKFILL_HISTORY_LIMIT: u8 = 50;
+// const BACKFILL_HISTORY_LIMIT: u8 = 50;
+const BACKFILL_HISTORY_LIMIT: u8 = 0;
 /// Total number of historical messages the bot should retain.
 const HISTORY_MAX_MESSAGES: usize = 50;
 
@@ -83,11 +84,10 @@ impl History {
         match self.0.entry(channel_id) {
             std::collections::hash_map::Entry::Occupied(o) => Ok(o.into_mut()),
             std::collections::hash_map::Entry::Vacant(v) => {
-                let channel_name = channel_id
-                    .name(&ctx.http)
-                    .await
-                    .unwrap_or("<unknown-room>".to_owned());
-                println!("+ Backfilling \"{}\" history... ", channel_name);
+                log_internal!(
+                    "Backfilling \"{}\" history... ",
+                    channel_id.color(ctx).await
+                );
 
                 // Backfill
                 // Ignore errors here.  May be serenity crate bug?
@@ -100,7 +100,11 @@ impl History {
                 // Iterate in reverse order so the messages are in chronological order
                 for msg in backfill_messages.iter().rev() {
                     let author_id = msg.author.id;
-                    let human_format = msg.human_format(ctx).await;
+                    let human_format = format!(
+                        "{}: {}",
+                        msg.author.display_name(),
+                        msg.human_format_content(ctx).await
+                    );
                     let entry = HistoryEntry {
                         author_id,
                         human_format,
@@ -108,7 +112,10 @@ impl History {
                     messages.push(entry);
                 }
 
-                println!("+ Backfilling \"{}\" history... done", channel_name);
+                log_internal!(
+                    "Backfilling \"{}\" history... done",
+                    channel_id.color(ctx).await
+                );
                 Ok(v.insert(messages))
             }
         }
@@ -127,7 +134,11 @@ impl History {
     pub async fn push(&mut self, ctx: &Context, msg: &Message) -> Result<()> {
         let channel_id = msg.channel_id;
         let author_id = msg.author.id;
-        let human_format = msg.human_format(ctx).await;
+        let human_format = format!(
+            "{}: {}",
+            msg.author.display_name(),
+            msg.human_format_content(ctx).await
+        );
         let entry = HistoryEntry {
             author_id,
             human_format,

@@ -1,8 +1,11 @@
 use crate::{
     event::*,
     helper::*,
-    plugin::history::{History, HistoryEntry},
-    plugin::*,
+    log_internal,
+    plugin::{
+        history::{History, HistoryEntry},
+        *,
+    },
 };
 use anyhow::{anyhow, Result};
 use serenity::{all::UserId, prelude::TypeMapKey};
@@ -92,7 +95,7 @@ impl Plugin for PluginLlm {
         if let Some(settings) = settings {
             ctx.data.write().await.insert::<LlmSettings>(settings);
         } else {
-            println!("+ No (valid) llm_settings.json found, disabling LLM subsystem");
+            log_internal!("No (valid) llm_settings.json found, disabling LLM subsystem");
         }
 
         Ok(())
@@ -116,7 +119,7 @@ impl Plugin for PluginLlm {
         // Interpret scenario where llm settings are not configured as opting out of this plugin
         let state = ctx.data.read().await;
         let Some(settings) = state.get::<LlmSettings>().cloned() else {
-            println!("+ No (valid) llm_settings.json found, skipping LLM response");
+            log_internal!("+ No (valid) llm_settings.json found, skipping LLM response");
             return Ok(EventHandled::No);
         };
         // Make sure to drop this read-lock on global state before we perform a following
@@ -190,7 +193,7 @@ impl LlmChatRequest {
     }
 
     async fn post(&self, url: &str) -> Result<String> {
-        println!("+ Querying chat endpoint {}... ", url);
+        log_internal!("Sending request to chat endpoint {}... ", url);
         let client = reqwest::Client::new();
         let response = client
             .post(url)
@@ -199,7 +202,7 @@ impl LlmChatRequest {
             .await?
             .json::<LlmChatResponse>()
             .await?;
-        println!("+ Querying chat endpoint {}... done", url);
+        log_internal!("Sending request to chat endpoint {}... done", url);
         let response_content = response.message.content;
 
         // TODO: split messages longer than the discord max of 2000 characters into multiple

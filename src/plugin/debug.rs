@@ -1,6 +1,7 @@
-use crate::{event::*, helper::*, plugin::*};
+use crate::{event::*, helper::*, log_event, logging::*, plugin::*};
 use anyhow::Result;
 use serenity::all::Context;
+use std::borrow::Cow;
 
 /// Prints debug information about event to stdout
 pub struct PluginDebug;
@@ -23,21 +24,22 @@ impl Plugin for PluginDebug {
         match event {
             Event::Handler => {}
             Event::Ready { ctx, ready } => {
-                let user = ctx.cache.current_user().clone();
-                let username = user.name.as_str();
-
-                println!(
-                    "* Connected {} server(s) as {}",
+                log_event!(
+                    "Connected to {} server(s) as {}",
                     ready.guilds.len(),
-                    username
+                    ctx.cache.current_user().color(),
                 );
             }
             Event::Message { ctx, msg } => {
-                println!(
-                    "* {}::{}::{}",
-                    msg.guild_name(ctx),
-                    msg.channel_name(ctx).await,
-                    msg.human_format(ctx).await,
+                log_event!(
+                    "{}{}{}{}{}{} {}",
+                    msg.guild_id.color(ctx).await,
+                    Glue {}.color(),
+                    msg.channel_id.color(ctx).await,
+                    Glue {}.color(),
+                    msg.author.color(),
+                    Glue {}.color(),
+                    msg.human_format_content(ctx).await,
                 );
             }
             Event::VoiceStateUpdate { ctx, old, new } => match (old, new.channel_id) {
@@ -45,36 +47,29 @@ impl Plugin for PluginDebug {
                     // State change within same channel, e.g. mute/unmute
                     // Not currently debug logging this
                 }
-                (Some(old), Some(_)) => println!(
-                    "* {} moved VC channel from \"{}\" to \"{}\"",
-                    new.user_id.name(ctx).await,
-                    old.channel_name(ctx).await,
-                    new.channel_name(ctx).await,
+                (Some(old), Some(_)) => log_event!(
+                    "{} moved VC channel from \"{}\" to \"{}\"",
+                    new.user_id.color(ctx).await,
+                    old.channel_id.color(ctx).await,
+                    new.channel_id.color(ctx).await,
                 ),
-                (Some(old), None) => println!(
-                    "* {} left VC channel \"{}\"",
-                    new.user_id.name(ctx).await,
-                    old.channel_name(ctx).await
+                (Some(old), None) => log_event!(
+                    "{} left VC channel \"{}\"",
+                    new.user_id.color(ctx).await,
+                    old.channel_id.color(ctx).await,
                 ),
-                (None, Some(_)) => println!(
-                    "* {} joined VC channel \"{}\"",
-                    new.user_id.name(ctx).await,
-                    new.channel_name(ctx).await,
+                (None, Some(_)) => log_event!(
+                    "{} joined VC channel \"{}\"",
+                    new.user_id.color(ctx).await,
+                    new.channel_id.color(ctx).await,
                 ),
-                (None, None) => println!("* Unknown voice state update"),
+                (None, None) => log_event!("Unknown voice state update"),
             },
             Event::ReactionAdd { ctx, reaction } => {
-                let username = if let Some(id) = reaction.user_id {
-                    id.name(ctx).await
-                } else {
-                    "<unknown-user>".to_string()
+                let message = match reaction.message(ctx).await {
+                    Ok(msg) => Cow::Owned(msg.human_format_content(ctx).await),
+                    Err(_) => Cow::Borrowed("<unknown-message>"),
                 };
-
-                let message = reaction
-                    .message(ctx)
-                    .await
-                    .map(|msg| msg.content.clone())
-                    .unwrap_or("<unknown-message>".to_string());
 
                 let emoji = match &reaction.emoji {
                     serenity::all::ReactionType::Custom {
@@ -86,18 +81,14 @@ impl Plugin for PluginDebug {
                     _ => "<unknown-emoji>".to_owned(),
                 };
 
-                println!(
-                    "* {} reacted to message \"{}\" with \"{}\"",
-                    username, message, emoji
+                log_event!(
+                    "{} reacted to message \"{}\" with \"{}\"",
+                    reaction.user_id.color(ctx).await,
+                    message,
+                    emoji
                 );
             }
             Event::ReactionRemove { ctx, reaction } => {
-                let username = if let Some(id) = reaction.user_id {
-                    id.name(ctx).await
-                } else {
-                    "<unknown-user>".to_string()
-                };
-
                 let message = reaction
                     .message(ctx)
                     .await
@@ -114,9 +105,11 @@ impl Plugin for PluginDebug {
                     _ => "<unknown-emoji>".to_owned(),
                 };
 
-                println!(
-                    "* {} removed reaction \"{}\" from message \"{}\"",
-                    username, emoji, message
+                log_event!(
+                    "{} removed reaction \"{}\" from message \"{}\"",
+                    reaction.user_id.color(ctx).await,
+                    emoji,
+                    message
                 );
             }
         }

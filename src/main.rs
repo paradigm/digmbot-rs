@@ -3,6 +3,7 @@ use anyhow::anyhow;
 
 mod event;
 mod helper;
+mod logging;
 mod plugin;
 
 use anyhow::Result;
