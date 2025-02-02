@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 use crate::helper::PathHelper;
 use anyhow::anyhow;
 

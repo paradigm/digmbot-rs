@@ -59,7 +59,7 @@ impl EventHandler for Event {
 impl Event {
     // When an event occurs, iterate over all the plugins to see if any can/should handle it.
     pub async fn handle(self) {
-        if let Event::Ready { ctx, ready } = &self {
+        if let Event::Ready { ctx, ready: _ } = &self {
             // Serenity crate ctx is ready to be used.  Initialize plugin states.
             for plugin in crate::plugin::plugins() {
                 if let Err(e) = plugin.init(ctx).await {

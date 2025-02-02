@@ -13,7 +13,7 @@ impl Plugin for PluginHelp {
         Some(";help - you are here")
     }
 
-    async fn init(&self, ctx: &Context) -> Result<()> {
+    async fn init(&self, _ctx: &Context) -> Result<()> {
         Ok(())
     }
 

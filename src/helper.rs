@@ -1,9 +1,6 @@
 use anyhow::{anyhow, Result};
 use serenity::all::Context;
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashMap, path::PathBuf};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[serenity::async_trait]
@@ -34,7 +31,7 @@ impl MessageHelper for serenity::all::Message {
             .unwrap_or_else(|_| "<unknown-channel>".into())
     }
 
-    fn author_name(&self, ctx: &Context) -> &str {
+    fn author_name(&self, _ctx: &Context) -> &str {
         self.author.display_name()
     }
 

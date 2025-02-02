@@ -13,7 +13,7 @@ impl Plugin for PluginRickRoll {
         Some(";music - fetch random music from YouTube")
     }
 
-    async fn init(&self, ctx: &Context) -> Result<()> {
+    async fn init(&self, _ctx: &Context) -> Result<()> {
         Ok(())
     }
 

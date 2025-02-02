@@ -11,9 +11,9 @@ use std::io::ErrorKind;
 /// Queries an LLM for a response
 pub struct PluginLlm;
 
+#[allow(unused)]
 #[derive(serde::Deserialize, Default, Clone)]
 struct LlmSettings {
-    completion_url: String,
     chat_url: String,
     model_name: String,
     system: String,
@@ -130,7 +130,7 @@ impl Plugin for PluginLlm {
 
         // Needs to be writable to backfill
         let mut state = ctx.data.write().await;
-        let mut history = state
+        let history = state
             .get_mut::<History>()
             .ok_or(anyhow!("History uninitialized"))?;
         let history = history.get(ctx, msg.channel_id).await?.clone();

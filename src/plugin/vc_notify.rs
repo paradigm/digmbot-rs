@@ -107,7 +107,7 @@ async fn handle_event(ctx: &Context, msg: &Message) -> Result<EventHandled> {
     };
 
     let mut state = ctx.data.write().await;
-    let mut state = state
+    let state = state
         .get_mut::<VcNotifyState>()
         .ok_or(anyhow!("VcNotify uninitialized"))?;
 
@@ -194,7 +194,7 @@ async fn handle_voice_state_update(
     }
 
     // Notify registered users
-    let mut state = ctx.data.read().await;
+    let state = ctx.data.read().await;
     let state = state
         .get::<VcNotifyState>()
         .ok_or(anyhow!("VcNotify state uninitialized"))?;

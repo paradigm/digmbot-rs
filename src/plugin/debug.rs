@@ -15,7 +15,7 @@ impl Plugin for PluginDebug {
         None
     }
 
-    async fn init(&self, ctx: &Context) -> Result<()> {
+    async fn init(&self, _ctx: &Context) -> Result<()> {
         Ok(())
     }
 
@@ -45,7 +45,7 @@ impl Plugin for PluginDebug {
                     // State change within same channel, e.g. mute/unmute
                     // Not currently debug logging this
                 }
-                (Some(old), Some(new_id)) => println!(
+                (Some(old), Some(_)) => println!(
                     "* {} moved VC channel from \"{}\" to \"{}\"",
                     new.user_id.name(ctx).await,
                     old.channel_name(ctx).await,
@@ -77,9 +77,11 @@ impl Plugin for PluginDebug {
                     .unwrap_or("<unknown-message>".to_string());
 
                 let emoji = match &reaction.emoji {
-                    serenity::all::ReactionType::Custom { animated, id, name } => {
-                        name.clone().unwrap_or("<unknown-emoji>".to_owned())
-                    }
+                    serenity::all::ReactionType::Custom {
+                        animated: _,
+                        id: _,
+                        name,
+                    } => name.clone().unwrap_or("<unknown-emoji>".to_owned()),
                     serenity::all::ReactionType::Unicode(s) => s.clone(),
                     _ => "<unknown-emoji>".to_owned(),
                 };
@@ -103,9 +105,11 @@ impl Plugin for PluginDebug {
                     .unwrap_or("<unknown-message>".to_string());
 
                 let emoji = match &reaction.emoji {
-                    serenity::all::ReactionType::Custom { animated, id, name } => {
-                        name.clone().unwrap_or("<unknown-emoji>".to_owned())
-                    }
+                    serenity::all::ReactionType::Custom {
+                        animated: _,
+                        id: _,
+                        name,
+                    } => name.clone().unwrap_or("<unknown-emoji>".to_owned()),
                     serenity::all::ReactionType::Unicode(s) => s.clone(),
                     _ => "<unknown-emoji>".to_owned(),
                 };

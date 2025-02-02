@@ -1,4 +1,4 @@
-use crate::{event::*, helper::*, plugin::*};
+use crate::{event::*, plugin::*};
 use anyhow::Result;
 
 /// Initializes state when the connection to Discord is ready.
@@ -14,12 +14,12 @@ impl Plugin for PluginReady {
         None
     }
 
-    async fn init(&self, ctx: &Context) -> Result<()> {
+    async fn init(&self, _ctx: &Context) -> Result<()> {
         Ok(())
     }
 
     async fn handle(&self, event: &Event) -> Result<EventHandled> {
-        let Event::Ready { ctx, ready } = event else {
+        let Event::Ready { ctx: _, ready: _ } = event else {
             return Ok(EventHandled::No);
         };
 

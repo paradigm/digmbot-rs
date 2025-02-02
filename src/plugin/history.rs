@@ -5,7 +5,7 @@ use serenity::{
     builder::GetMessages,
     prelude::TypeMapKey,
 };
-use std::collections::{hash_map, HashMap};
+use std::collections::HashMap;
 
 /// How many messages the bot should backfill when it first sees a channel.
 const BACKFILL_HISTORY_LIMIT: u8 = 50;
@@ -38,9 +38,8 @@ impl Plugin for PluginHistory {
             return Ok(EventHandled::No);
         };
 
-        let channel_id = msg.channel_id;
         let mut state = ctx.data.write().await;
-        let mut history = state
+        let history = state
             .get_mut::<History>()
             .ok_or(anyhow!("History uninitialized"))?;
         history.push(ctx, msg).await?;
@@ -57,11 +56,12 @@ pub struct History(HashMap<ChannelId, Vec<HistoryEntry>>);
 #[derive(Clone)]
 pub struct HistoryEntry {
     pub author_id: UserId,
-    pub content: String,
-    /// Message formatted similarly to IRC
+    /// Message content formatted in a human and LLM-readable format, similar to IRC
     /// Useful for:
-    /// - Human-readable, e.g. debugging
-    /// - Simple LLM workflows, although the LLM will not know how to mention (i.e. `@`-ping)
+    /// - Human-readable debug logs
+    /// - Simple LLM workflows
+    ///
+    /// Information needed to do things like mention (i.e. `@`-ping) has been scrubbed.
     pub human_format: String,
 }
 
@@ -91,7 +91,7 @@ impl History {
 
                 // Backfill
                 // Ignore errors here.  May be serenity crate bug?
-                let mut backfill_messages = channel_id
+                let backfill_messages = channel_id
                     .messages(ctx, GetMessages::new().limit(BACKFILL_HISTORY_LIMIT))
                     .await
                     .unwrap_or_default();
@@ -100,11 +100,9 @@ impl History {
                 // Iterate in reverse order so the messages are in chronological order
                 for msg in backfill_messages.iter().rev() {
                     let author_id = msg.author.id;
-                    let content = msg.content.clone();
                     let human_format = msg.human_format(ctx).await;
                     let entry = HistoryEntry {
                         author_id,
-                        content,
                         human_format,
                     };
                     messages.push(entry);
@@ -122,18 +120,16 @@ impl History {
         ctx: &Context,
         channel_id: ChannelId,
     ) -> Result<&Vec<HistoryEntry>> {
-        let mut messages = self.get_mut(ctx, channel_id).await?;
+        let messages = self.get_mut(ctx, channel_id).await?;
         Ok(messages)
     }
 
     pub async fn push(&mut self, ctx: &Context, msg: &Message) -> Result<()> {
         let channel_id = msg.channel_id;
         let author_id = msg.author.id;
-        let content = msg.content.clone();
         let human_format = msg.human_format(ctx).await;
         let entry = HistoryEntry {
             author_id,
-            content,
             human_format,
         };
 
@@ -145,20 +141,5 @@ impl History {
         }
 
         Ok(())
-    }
-
-    // Needs to be mut to backfill
-    pub async fn human_format_concat(
-        &mut self,
-        ctx: &Context,
-        channel_id: ChannelId,
-    ) -> Result<String> {
-        Ok(self
-            .get_mut(ctx, channel_id)
-            .await?
-            .iter()
-            .map(|entry| entry.human_format.as_str())
-            .collect::<Vec<&str>>()
-            .join("\n"))
     }
 }

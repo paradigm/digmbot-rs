@@ -13,7 +13,7 @@ impl Plugin for PluginXkcd {
         Some(";xkcd - show random xkcd comic")
     }
 
-    async fn init(&self, ctx: &Context) -> Result<()> {
+    async fn init(&self, _ctx: &Context) -> Result<()> {
         Ok(())
     }
 
