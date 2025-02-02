@@ -1,12 +1,12 @@
 use crate::{event::*, plugin::*};
 use anyhow::Result;
 
-pub struct PluginRickRoll;
+pub struct PluginMusic;
 
 #[serenity::async_trait]
-impl Plugin for PluginRickRoll {
+impl Plugin for PluginMusic {
     fn name(&self) -> &'static str {
-        "RickRoll"
+        "Music"
     }
 
     fn usage(&self) -> Option<&'static str> {
@@ -22,8 +22,8 @@ impl Plugin for PluginRickRoll {
             return Ok(EventHandled::No);
         };
 
-        const RICK_ROLL_URL: &str = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
-        msg.reply(&ctx, RICK_ROLL_URL).await?;
+        const MUSIC_URL: &str = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+        msg.reply(&ctx, MUSIC_URL).await?;
         Ok(EventHandled::Yes)
     }
 }

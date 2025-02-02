@@ -6,8 +6,8 @@ mod debug;
 mod help;
 mod history;
 mod llm;
+mod music;
 mod ready;
-mod rickroll;
 mod vc_notify;
 mod xkcd;
 
@@ -39,7 +39,7 @@ pub fn plugins() -> Vec<Box<dyn Plugin>> {
         Box::new(help::PluginHelp),
         // Random stuff
         Box::new(xkcd::PluginXkcd),
-        Box::new(rickroll::PluginRickRoll),
+        Box::new(music::PluginMusic),
         // Voice Chat
         Box::new(vc_notify::PluginVcNotify),
         // LLM fallback, used if no other plugin handles the event.
