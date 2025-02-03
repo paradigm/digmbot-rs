@@ -101,7 +101,7 @@ impl Event {
             }
             _ => None,
         }
-    }  
+    } 
 }
 
 pub enum EventHandled {
