@@ -11,12 +11,13 @@ use serenity::prelude::{Client, GatewayIntents};
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let bot_settings = helper::BotSettings::load().await?;
+
     let token = helper::config_path("discord_token")?
         .read_to_string()
         .await
         .map_err(|e| anyhow!("Error reading discord_token: {}", e))?;
 
-    // Things we want discord to tell us about.
     let intents = GatewayIntents::DIRECT_MESSAGES
         | GatewayIntents::DIRECT_MESSAGE_REACTIONS
         | GatewayIntents::GUILDS
@@ -26,10 +27,14 @@ async fn main() -> Result<()> {
         | GatewayIntents::GUILD_VOICE_STATES
         | GatewayIntents::MESSAGE_CONTENT;
 
-    Client::builder(&token, intents)
+    let mut client = Client::builder(&token, intents)
         .event_handler(crate::event::Event::Handler)
-        .await?
-        .start()
-        .await
-        .map_err(Into::into)
+        .await?;
+
+    {
+        let mut data = client.data.write().await;
+        data.insert::<helper::BotSettings>(bot_settings);
+    }
+
+    client.start().await.map_err(Into::into)
 }

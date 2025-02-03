@@ -85,6 +85,18 @@ For example:
 }
 ```
 
+### Bot settings
+
+Create a basic json file at `~/.config/digmbot/bot_settings.json` (on Linux) or the equivalent (on other platforms) with the following json keys:
+
+```
+{
+	"command_prefix": "!"
+}
+```
+
+If you do not specify a command prefix, the bot will use the default of `;`.
+
 ### Architecture
 
 ```

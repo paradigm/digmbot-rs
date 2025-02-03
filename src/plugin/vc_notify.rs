@@ -1,7 +1,7 @@
 use crate::{event::*, helper::*, plugin::*};
 use anyhow::{anyhow, Result};
 use serenity::{
-    all::{CreateMessage, GuildId, Message, UserId, VoiceState},
+    all::{CreateMessage, GuildId, UserId, VoiceState},
     prelude::TypeMapKey,
 };
 use std::{
@@ -29,7 +29,7 @@ impl Plugin for PluginVcNotify {
 
     fn usage(&self) -> Option<&'static str> {
         Some(
-            ";vc-notify <follow/unfollow> [server-id] - voice channel activity notifications\n\
+            "vc-notify <follow/unfollow> [server-id] - voice channel activity notifications\n\
              |  If messaging in server, [server-id] is derived from context.\n\
              |  If DMing rather than messaging in-server, requires [server-id].\n\
              |  Right-click on server icon > copy ID to get server-id",
@@ -49,7 +49,7 @@ impl Plugin for PluginVcNotify {
 
     async fn handle(&self, event: &Event) -> Result<EventHandled> {
         match event {
-            Event::Message { ctx, msg } => handle_event(ctx, msg).await,
+            Event::Message { ctx: _, msg: _ } => handle_event(event).await,
             Event::VoiceStateUpdate { ctx, old, new } => {
                 handle_voice_state_update(ctx, old, new).await
             }
@@ -58,12 +58,12 @@ impl Plugin for PluginVcNotify {
     }
 }
 
-async fn handle_event(ctx: &Context, msg: &Message) -> Result<EventHandled> {
-    let terms: Vec<&str> = msg.content.split_whitespace().collect();
-    if terms.first() != Some(&";vc-notify") {
+async fn handle_event(event: &Event) -> Result<EventHandled> {
+    let Some((ctx, msg)) = event.is_bot_cmd("vc-notify") else {
         return Ok(EventHandled::No);
-    }
-
+    };
+    
+    let terms: Vec<&str> = msg.content.split_whitespace().collect();
     let cmd = match terms.get(1) {
         Some(&"follow") => VcNotifyCmd::Follow,
         Some(&"unfollow") => VcNotifyCmd::Unfollow,
