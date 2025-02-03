@@ -6,6 +6,9 @@ use serenity::{
     all::{EventHandler, Message, Reaction, Ready, VoiceState},
     client::Context,
 };
+use crate::helper::BotSettings;
+use tokio::task;
+use tokio::runtime::Handle;
 
 /// A Discord event
 pub enum Event {
@@ -80,17 +83,25 @@ impl Event {
 
     // Check if a message should be interpreted as a special bot command.
     //
-    // These are typically prefixed with a semicolon, e. g. `;cmd foo bar baz`.
+    // These are typically prefixed with a semicolon, e. g. `;cmd foo bar baz`, but can be
+    // configured to use a different prefix.
     pub fn is_bot_cmd(&self, cmd: &str) -> Option<(&Context, &Message)> {
         match self {
-            Event::Message { ctx, msg }
-                if msg.content.split_ascii_whitespace().next() == Some(cmd) =>
-            {
-                Some((ctx, msg))
+            Event::Message { ctx, msg } => {
+                let data = task::block_in_place(|| Handle::current().block_on(ctx.data.read()));
+                let settings = data.get::<BotSettings>().expect("Bot settings not found");
+                let cmd = cmd.trim_start_matches(&settings.command_prefix);
+                let full_cmd = format!("{}{}", settings.command_prefix, cmd);
+                
+                if msg.content.split_ascii_whitespace().next() == Some(&full_cmd) {
+                    Some((ctx, msg))
+                } else {
+                    None
+                }
             }
             _ => None,
         }
-    }
+    }  
 }
 
 pub enum EventHandled {

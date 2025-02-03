@@ -1,7 +1,13 @@
 use anyhow::{anyhow, Result};
-use serenity::all::Context;
-use std::{collections::HashMap, path::PathBuf};
+use serenity::{all::Context, prelude::TypeMapKey};
+use std::{collections::HashMap, io::ErrorKind, path::PathBuf};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+#[derive(serde::Deserialize, Default, Clone)]
+pub struct BotSettings {
+    pub command_prefix: String,
+}
+
 
 #[serenity::async_trait]
 pub trait MessageHelper {
@@ -157,6 +163,22 @@ impl PathHelper for PathBuf {
     }
 }
 
+impl BotSettings {
+    pub async fn load() -> Result<Self> {
+        match config_path("bot_settings.json")?.read_to_bytes().await {
+            Ok(data) => serde_json::from_slice(&data)
+                .map_err(|e| anyhow!("Failed to deserialize bot_settings.json: {}", e)),
+            Err(e) if e.kind() == ErrorKind::NotFound => Ok(BotSettings {
+                command_prefix: ";".to_string(), // Default prefix
+            }),
+            Err(e) => Err(anyhow!("Failed to read bot_settings.json: {}", e)),
+        }
+    }
+}
+
+impl TypeMapKey for BotSettings {
+    type Value = BotSettings;
+}
 // Path to file within digmbot settings, configuration, and state directory.
 // On Linux, this would be ~/.config/digmbot/<filename>
 pub fn config_path(filename: &str) -> Result<PathBuf> {

@@ -10,7 +10,7 @@ impl Plugin for PluginXkcd {
     }
 
     fn usage(&self) -> Option<&'static str> {
-        Some(";xkcd - show random xkcd comic")
+        Some("xkcd - show random xkcd comic")
     }
 
     async fn init(&self, _ctx: &Context) -> Result<()> {
@@ -18,7 +18,7 @@ impl Plugin for PluginXkcd {
     }
 
     async fn handle(&self, event: &Event) -> Result<EventHandled> {
-        let Some((ctx, msg)) = event.is_bot_cmd(";xkcd") else {
+        let Some((ctx, msg)) = event.is_bot_cmd("xkcd") else {
             return Ok(EventHandled::No);
         };
 

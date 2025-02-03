@@ -77,6 +77,18 @@ For example:
 }
 ```
 
+### Bot settings
+
+The bot's command prefix can be configured by adding a `command_prefix` key to the `llm_settings.json` file.
+
+```
+{
+	"command_prefix": "!"
+}
+```
+
+If you do not specify a command prefix, the bot will use the default of `;`.
+
 ### Architecture
 
 ```
