@@ -165,12 +165,13 @@ impl LlmChatRequest {
         let mut history_messages = Vec::new();
         // Iterate from the most recent to the oldest.
         for entry in history.iter().rev() {
-            let role = if entry.author_id == bot_id {
-                ChatMessageRole::assistant
+            let (role, content) = if entry.author_id == bot_id {
+                let content = entry.human_format_content.clone();
+                (ChatMessageRole::assistant, content)
             } else {
-                ChatMessageRole::user
+                let content = format!("{}: {}", entry.author_name, &entry.human_format_content);
+                (ChatMessageRole::user, content)
             };
-            let content = entry.human_format.clone();
             total_len += content.len();
             // Use content length as a crude estimate of tokens.
             if total_len / 3 > settings.context_size {
@@ -193,6 +194,10 @@ impl LlmChatRequest {
     }
 
     async fn post(&self, url: &str) -> Result<String> {
+        for msg in &self.messages {
+            println!("> {}", msg.content);
+        }
+
         log_internal!("Sending request to chat endpoint {}... ", url);
         let client = reqwest::Client::new();
         let response = client

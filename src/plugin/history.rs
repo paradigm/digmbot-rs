@@ -57,13 +57,10 @@ pub struct History(HashMap<ChannelId, Vec<HistoryEntry>>);
 #[derive(Clone)]
 pub struct HistoryEntry {
     pub author_id: UserId,
-    /// Message content formatted in a human and LLM-readable format, similar to IRC
-    /// Useful for:
-    /// - Human-readable debug logs
-    /// - Simple LLM workflows
-    ///
-    /// Information needed to do things like mention (i.e. `@`-ping) has been scrubbed.
-    pub human_format: String,
+    pub author_name: String,
+    // Translate Discord markup such as `<@123>` to human (and LLM) understandable formats such as
+    // usernames.
+    pub human_format_content: String,
 }
 
 // Serenity crate system to support this type in the Serenity Context
@@ -100,14 +97,20 @@ impl History {
                 // Iterate in reverse order so the messages are in chronological order
                 for msg in backfill_messages.iter().rev() {
                     let author_id = msg.author.id;
-                    let human_format = format!(
-                        "{}: {}",
-                        msg.author.display_name(),
-                        msg.human_format_content(ctx).await
-                    );
+                    let author_name = match msg.guild_id {
+                        Some(guild_id) => msg
+                            .author
+                            .nick_in(ctx, guild_id)
+                            .await
+                            .unwrap_or(msg.author.name.clone()),
+                        None => msg.author.name.clone(),
+                    };
+                    let human_format_content = msg.human_format_content(ctx).await;
+
                     let entry = HistoryEntry {
                         author_id,
-                        human_format,
+                        author_name,
+                        human_format_content,
                     };
                     messages.push(entry);
                 }
@@ -134,14 +137,19 @@ impl History {
     pub async fn push(&mut self, ctx: &Context, msg: &Message) -> Result<()> {
         let channel_id = msg.channel_id;
         let author_id = msg.author.id;
-        let human_format = format!(
-            "{}: {}",
-            msg.author.display_name(),
-            msg.human_format_content(ctx).await
-        );
+        let author_name = match msg.guild_id {
+            Some(guild_id) => msg
+                .author
+                .nick_in(ctx, guild_id)
+                .await
+                .unwrap_or(msg.author.name.clone()),
+            None => msg.author.name.clone(),
+        };
+        let human_format_content = msg.human_format_content(ctx).await;
         let entry = HistoryEntry {
             author_id,
-            human_format,
+            author_name,
+            human_format_content,
         };
 
         let history = self.get_mut(ctx, channel_id).await?;
