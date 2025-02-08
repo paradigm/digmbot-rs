@@ -8,6 +8,7 @@ mod history;
 mod llm;
 mod music;
 mod ready;
+mod rivals_rating;
 mod vc_notify;
 mod xkcd;
 
@@ -40,6 +41,7 @@ pub fn plugins() -> Vec<Box<dyn Plugin>> {
         // Random stuff
         Box::new(xkcd::PluginXkcd),
         Box::new(music::PluginMusic),
+        Box::new(rivals_rating::PluginRivalsRating),
         // Voice Chat
         Box::new(vc_notify::PluginVcNotify),
         // LLM fallback, used if no other plugin handles the event.
