@@ -9,6 +9,8 @@ use std::{
     io::ErrorKind,
     time::{Duration, Instant},
 };
+use tokio::sync::RwLock;
+use crate::config::Config;
 
 // Maximum rate to notify users. This avoids spam should someone repeatedly join and leave VC.
 const NOTIFY_RATE_LIMIT: Duration = Duration::from_secs(60 * 10);
@@ -27,13 +29,12 @@ impl Plugin for PluginVcNotify {
         "VcNotify"
     }
 
-    fn usage(&self) -> Option<&'static str> {
-        Some(
-            ";vc-notify <follow/unfollow> [server-id] - voice channel activity notifications\n\
+    fn usage(&self, cfg: &RwLock<Config>) -> Option<String> {
+        let prefix = &cfg.read().await.general.command_prefix;
+        Some(format!("{}vc-notify <follow/unfollow> [server-id] - voice channel activity notifications\n\
              |  If messaging in server, [server-id] is derived from context.\n\
              |  If DMing rather than messaging in-server, requires [server-id].\n\
-             |  Right-click on server icon > copy ID to get server-id",
-        )
+             |  Right-click on server icon > copy ID to get server-id", prefix))
     }
 
     async fn init(&self, ctx: &Context) -> Result<()> {
@@ -59,8 +60,12 @@ impl Plugin for PluginVcNotify {
 }
 
 async fn handle_event(ctx: &Context, msg: &Message) -> Result<EventHandled> {
+    let config = ctx.data.read().await;
+    let prefix = &config.get::<RwLock<Config>>().unwrap().read().await.general.command_prefix;
+    let command_name = format!("{}vc-notify", prefix);
+
     let terms: Vec<&str> = msg.content.split_whitespace().collect();
-    if terms.first() != Some(&";vc-notify") {
+    if terms.first() != Some(&command_name.as_str()) {
         return Ok(EventHandled::No);
     }
 
@@ -208,8 +213,8 @@ async fn handle_voice_state_update(
     let message = CreateMessage::new().content(format!(
         "{} joined VC channel {} in {}\n\
             \n\
-            You can opt out of these notifications by replying `;vc-notify unfollow {}`\n",
-        new_user_name, channel_name, guild.name, guild.id
+            You can opt out of these notifications by replying `{}vc-notify unfollow {}`\n",
+        new_user_name, channel_name, guild.name, prefix, guild.id
     ));
 
     let now = std::time::Instant::now();

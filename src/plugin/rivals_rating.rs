@@ -7,6 +7,8 @@ use serenity::{
 use std::{collections::HashMap, path::PathBuf};
 use tokio::fs as tokio_fs;
 use tokio::io::AsyncWriteExt;
+use tokio::sync::RwLock;
+use crate::config::Config;
 
 use crate::{event::*, plugin::*};
 
@@ -95,15 +97,15 @@ impl Plugin for PluginRivalsRating {
         "Rivals"
     }
 
-    fn usage(&self) -> Option<&'static str> {
-        Some(
-            ";rivals create <initial_rating> [player_name] - Create a new player\n\
-             ;rivals delete <player_name> - Delete one of your players\n\
-             ;rivals list - List all players (ordered by rating descending)\n\
-             ;rivals history <player_name> - Show a player's match history\n\
-             ;rivals preview <player1> <player2> - Show ratings and starting handicap\n\
-             ;rivals report <loser_player> <winner_player> - Report a match result (you must own the loser)",
-        )
+    fn usage(&self, cfg: &RwLock<Config>) -> Option<String> {
+        let prefix = &cfg.read().await.general.command_prefix;
+        Some(format!("{}rivals create <initial_rating> [player_name] - Create a new player\n\
+             {}rivals delete <player_name> - Delete one of your players\n\
+             {}rivals list - List all players (ordered by rating descending)\n\
+             {}rivals history <player_name> - Show a player's match history\n\
+             {}rivals preview <player1> <player2> - Show ratings and starting handicap\n\
+             {}rivals report <loser_player> <winner_player> - Report a match result (you must own the loser)",
+             prefix, prefix, prefix, prefix, prefix, prefix))
     }
 
     async fn init(&self, ctx: &Context) -> Result<()> {
@@ -127,8 +129,12 @@ impl Plugin for PluginRivalsRating {
 
 async fn handle_message(ctx: &Context, msg: &Message) -> Result<EventHandled> {
     // Only process messages that start with ";rivals"
+    let config = ctx.data.read().await;
+    let prefix = &config.get::<RwLock<Config>>().unwrap().read().await.general.command_prefix;
+    let command_name = format!("{}rivals", prefix);
+
     let tokens: Vec<&str> = msg.content.split_whitespace().collect();
-    if tokens.is_empty() || tokens[0] != ";rivals" {
+    if tokens.is_empty() || tokens[0] != command_name {
         return Ok(EventHandled::No);
     }
 
@@ -168,8 +174,12 @@ async fn handle_message(ctx: &Context, msg: &Message) -> Result<EventHandled> {
 /// Create a new player.
 /// Usage: ;rivals create <initial_rating> [player_name]
 async fn handle_create(ctx: &Context, msg: &Message, args: &[&str]) -> Result<EventHandled> {
+    let config = ctx.data.read().await;
+    let prefix = &config.get::<RwLock<Config>>().unwrap().read().await.general.command_prefix;
+    let command_name = format!("{}rivals create", prefix);
+
     if args.is_empty() {
-        msg.reply(ctx, "Usage: ;rivals create <initial_rating> [player_name]")
+        msg.reply(ctx, format!("Usage: {} <initial_rating> [player_name]", command_name))
             .await?;
         return Ok(EventHandled::Yes);
     }
@@ -225,8 +235,12 @@ async fn handle_create(ctx: &Context, msg: &Message, args: &[&str]) -> Result<Ev
 /// Delete an existing player.
 /// Usage: ;rivals delete <player_name>
 async fn handle_delete(ctx: &Context, msg: &Message, args: &[&str]) -> Result<EventHandled> {
+    let config = ctx.data.read().await;
+    let prefix = &config.get::<RwLock<Config>>().unwrap().read().await.general.command_prefix;
+    let command_name = format!("{}rivals delete", prefix);
+
     if args.is_empty() {
-        msg.reply(ctx, "Usage: ;rivals delete <player_name>")
+        msg.reply(ctx, format!("Usage: {} <player_name>", command_name))
             .await?;
         return Ok(EventHandled::Yes);
     }
@@ -263,6 +277,10 @@ async fn handle_delete(ctx: &Context, msg: &Message, args: &[&str]) -> Result<Ev
 /// List all players ordered by rating (best first).
 /// Usage: ;rivals list
 async fn handle_list(ctx: &Context, msg: &Message) -> Result<EventHandled> {
+    let config = ctx.data.read().await;
+    let prefix = &config.get::<RwLock<Config>>().unwrap().read().await.general.command_prefix;
+    let _command_name = format!("{}rivals list", prefix); // Not used, but kept for consistency
+
     let data = ctx.data.read().await;
     let state = data
         .get::<RivalsStateKey>()
@@ -293,8 +311,12 @@ async fn handle_list(ctx: &Context, msg: &Message) -> Result<EventHandled> {
 /// Show a player's match history.
 /// Usage: ;rivals history <player_name>
 async fn handle_history(ctx: &Context, msg: &Message, args: &[&str]) -> Result<EventHandled> {
+    let config = ctx.data.read().await;
+    let prefix = &config.get::<RwLock<Config>>().unwrap().read().await.general.command_prefix;
+    let command_name = format!("{}rivals history", prefix);
+
     if args.is_empty() {
-        msg.reply(ctx, "Usage: ;rivals history <player_name>")
+        msg.reply(ctx, format!("Usage: {} <player_name>", command_name))
             .await?;
         return Ok(EventHandled::Yes);
     }
@@ -348,8 +370,11 @@ async fn handle_history(ctx: &Context, msg: &Message, args: &[&str]) -> Result<E
 /// Preview a match between two players.
 /// Usage: ;rivals preview <player1> <player2>
 async fn handle_preview(ctx: &Context, msg: &Message, args: &[&str]) -> Result<EventHandled> {
+    let config = ctx.data.read().await;
+    let prefix = &config.get::<RwLock<Config>>().unwrap().read().await.general.command_prefix;
+    let command_name = format!("{}rivals preview", prefix);
     if args.len() < 2 {
-        msg.reply(ctx, "Usage: ;rivals preview <player1> <player2>")
+        msg.reply(ctx, format!("Usage: {} <player1> <player2>", command_name))
             .await?;
         return Ok(EventHandled::Yes);
     }
@@ -409,8 +434,12 @@ async fn handle_preview(ctx: &Context, msg: &Message, args: &[&str]) -> Result<E
 /// Report a match result where your player lost to another player's win.
 /// Usage: ;rivals report <loser_player> <winner_player>
 async fn handle_report(ctx: &Context, msg: &Message, args: &[&str]) -> Result<EventHandled> {
+    let config = ctx.data.read().await;
+    let prefix = &config.get::<RwLock<Config>>().unwrap().read().await.general.command_prefix;
+    let command_name = format!("{}rivals report", prefix);
+
     if args.len() < 2 {
-        msg.reply(ctx, "Usage: ;rivals report <loser_player> <winner_player>")
+        msg.reply(ctx, format!("Usage: {} <loser_player> <winner_player>", command_name))
             .await?;
         return Ok(EventHandled::Yes);
     }

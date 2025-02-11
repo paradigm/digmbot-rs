@@ -2,6 +2,8 @@ use crate::{event::*, helper::*, log_event, logging::*, plugin::*};
 use anyhow::Result;
 use serenity::all::Context;
 use std::borrow::Cow;
+use tokio::sync::RwLock;
+use crate::config::Config;
 
 /// Prints debug information about event to stdout
 pub struct PluginDebug;
@@ -12,7 +14,7 @@ impl Plugin for PluginDebug {
         "Debug"
     }
 
-    fn usage(&self) -> Option<&'static str> {
+    fn usage(&self, _cfg: &RwLock<Config>) -> Option<String> {
         None
     }
 

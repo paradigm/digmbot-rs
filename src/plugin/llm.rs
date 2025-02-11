@@ -10,6 +10,8 @@ use crate::{
 use anyhow::{anyhow, Result};
 use serenity::{all::UserId, prelude::TypeMapKey};
 use std::io::ErrorKind;
+use tokio::sync::RwLock;
+use crate::config::Config;
 
 /// Queries an LLM for a response
 pub struct PluginLlm;
@@ -85,7 +87,7 @@ impl Plugin for PluginLlm {
         "LLM"
     }
 
-    fn usage(&self) -> Option<&'static str> {
+    fn usage(&self, _cfg: &RwLock<Config>) -> Option<String> {
         None
     }
 

@@ -1,4 +1,4 @@
-use crate::event::EventHandled;
+use crate::{event::EventHandled, config::Config};
 use anyhow::Result;
 use serenity::all::Context;
 use tokio::sync::RwLock;

@@ -1,5 +1,7 @@
 use crate::{event::*, plugin::*};
 use anyhow::Result;
+use tokio::sync::RwLock;
+use crate::config::Config;
 
 pub struct PluginXkcd;
 
@@ -9,8 +11,9 @@ impl Plugin for PluginXkcd {
         "Xkcd"
     }
 
-    fn usage(&self) -> Option<&'static str> {
-        Some(";xkcd - show random xkcd comic")
+    fn usage(&self, cfg: &RwLock<Config>) -> Option<String> {
+        let prefix = &cfg.read().await.general.command_prefix;
+        Some(format!("{}xkcd - show random xkcd comic", prefix))
     }
 
     async fn init(&self, _ctx: &Context) -> Result<()> {

@@ -1,5 +1,7 @@
 use crate::{event::*, plugin::*};
 use anyhow::Result;
+use tokio::sync::RwLock;
+use crate::config::Config;
 
 pub struct PluginMusic;
 
@@ -9,8 +11,9 @@ impl Plugin for PluginMusic {
         "Music"
     }
 
-    fn usage(&self) -> Option<&'static str> {
-        Some(";music - fetch random music from YouTube")
+    fn usage(&self, cfg: &RwLock<Config>) -> Option<String> {
+        let prefix = &cfg.read().await.general.command_prefix;
+        Some(format!("{}music - fetch random music from YouTube", prefix))
     }
 
     async fn init(&self, _ctx: &Context) -> Result<()> {
