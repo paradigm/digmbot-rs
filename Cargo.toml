@@ -19,3 +19,5 @@ dirs = "5.0"
 reqwest = { version = "0.11.24", features = ["json"] }
 # paste tokens in macros
 paste = "1.0.14"
+# ini-like configuration
+toml = "0.8.20"

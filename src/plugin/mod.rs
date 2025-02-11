@@ -1,6 +1,7 @@
 use crate::event::EventHandled;
 use anyhow::Result;
 use serenity::all::Context;
+use tokio::sync::RwLock;
 
 mod debug;
 mod help;
@@ -17,7 +18,7 @@ pub trait Plugin: Sync + Send {
     /// Plugin name.  Used for debug
     fn name(&self) -> &'static str;
     /// Help message line.  None if no help message
-    fn usage(&self) -> Option<&'static str>;
+    fn usage(&self, cfg: &RwLock<Config>) -> Option<String>;
     /// Initialize state information
     async fn init(&self, ctx: &Context) -> Result<()>;
     /// Potentially handle event.  Returns:

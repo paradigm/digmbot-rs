@@ -1,20 +1,21 @@
 use crate::helper::PathHelper;
 use anyhow::anyhow;
+use tokio::sync::RwLock;
 
+mod config;
 mod event;
 mod helper;
 mod logging;
 mod plugin;
 
 use anyhow::Result;
+use config::Config;
 use serenity::prelude::{Client, GatewayIntents};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let token = helper::config_path("discord_token")?
-        .read_to_string()
-        .await
-        .map_err(|e| anyhow!("Error reading discord_token: {}", e))?;
+    let config = Config::load().await.map(RwLock::new)?;
+    let token = config.read().await.general.discord_token.clone();
 
     // Things we want discord to tell us about.
     let intents = GatewayIntents::DIRECT_MESSAGES
