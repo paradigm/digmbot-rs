@@ -1,7 +1,7 @@
+use crate::config::Config;
 use crate::{event::*, plugin::*};
 use anyhow::Result;
 use tokio::sync::RwLock;
-use crate::config::Config;
 
 /// Initializes state when the connection to Discord is ready.
 pub struct PluginReady;
@@ -12,7 +12,7 @@ impl Plugin for PluginReady {
         "Ready"
     }
 
-    fn usage(&self, _cfg: &RwLock<Config>) -> Option<String> {
+    async fn usage(&self, _cfg: &RwLock<Config>) -> Option<String> {
         None
     }
 

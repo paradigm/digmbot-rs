@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::{event::*, helper::MessageHelper, log_internal, logging::*, plugin::*};
 use anyhow::{anyhow, Result};
 use serenity::{
@@ -7,7 +8,6 @@ use serenity::{
 };
 use std::collections::HashMap;
 use tokio::sync::RwLock;
-use crate::config::Config;
 
 /// How many messages the bot should backfill when it first sees a channel.
 // const BACKFILL_HISTORY_LIMIT: u8 = 50;
@@ -24,7 +24,7 @@ impl Plugin for PluginHistory {
         "History"
     }
 
-    fn usage(&self, _cfg: &RwLock<Config>) -> Option<String> {
+    async fn usage(&self, _cfg: &RwLock<Config>) -> Option<String> {
         None
     }
 

@@ -1,4 +1,4 @@
-use crate::{event::EventHandled, config::Config};
+use crate::{config::Config, event::EventHandled};
 use anyhow::Result;
 use serenity::all::Context;
 use tokio::sync::RwLock;
@@ -18,15 +18,19 @@ pub trait Plugin: Sync + Send {
     /// Plugin name.  Used for debug
     fn name(&self) -> &'static str;
     /// Help message line.  None if no help message
-    fn usage(&self, cfg: &RwLock<Config>) -> Option<String>;
+    async fn usage(&self, cfg: &RwLock<Config>) -> Option<String>;
     /// Initialize state information
-    async fn init(&self, ctx: &Context) -> Result<()>;
+    async fn init(&self, cfg: &RwLock<Config>, ctx: &Context) -> Result<()>;
     /// Potentially handle event.  Returns:
     /// - Ok(EventHandled::Yes) if the event has been handled and no other plugin should attempt to
     /// handle it
     /// - Ok(EventHandled::No) if another plugin should attempt to handle the event
     /// - Err if an error occurred
-    async fn handle(&self, event: &crate::event::Event) -> Result<EventHandled>;
+    async fn handle(
+        &self,
+        cfg: &RwLock<Config>,
+        event: &crate::event::Event,
+    ) -> Result<EventHandled>;
 }
 
 /// Ordered list of available plugins

@@ -1,7 +1,5 @@
 use crate::{event::*, plugin::*};
 use anyhow::Result;
-use tokio::sync::RwLock;
-use crate::config::Config;
 
 pub struct PluginHelp;
 
@@ -11,9 +9,8 @@ impl Plugin for PluginHelp {
         "Help"
     }
 
-    fn usage(&self, cfg: &RwLock<Config>) -> Option<String> {
-        let prefix = &cfg.read().await.general.command_prefix;
-        Some(format!("{}help - you are here", prefix))
+    async fn usage(&self, _cfg: &RwLock<Config>) -> Option<String> {
+        None
     }
 
     async fn init(&self, _ctx: &Context) -> Result<()> {
@@ -29,7 +26,7 @@ impl Plugin for PluginHelp {
         reply.push_str("```\n");
         reply.push_str("Commands:\n");
         for plugin in crate::plugin::plugins() {
-            if let Some(usage) = plugin.usage() {
+            if let Some(usage) = plugin.usage(cfg).await {
                 reply.push_str(&usage);
                 reply.push('\n');
             }

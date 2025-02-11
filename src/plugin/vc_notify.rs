@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::{event::*, helper::*, plugin::*};
 use anyhow::{anyhow, Result};
 use serenity::{
@@ -10,7 +11,6 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::RwLock;
-use crate::config::Config;
 
 // Maximum rate to notify users. This avoids spam should someone repeatedly join and leave VC.
 const NOTIFY_RATE_LIMIT: Duration = Duration::from_secs(60 * 10);
@@ -29,12 +29,15 @@ impl Plugin for PluginVcNotify {
         "VcNotify"
     }
 
-    fn usage(&self, cfg: &RwLock<Config>) -> Option<String> {
+    async fn usage(&self, cfg: &RwLock<Config>) -> Option<String> {
         let prefix = &cfg.read().await.general.command_prefix;
-        Some(format!("{}vc-notify <follow/unfollow> [server-id] - voice channel activity notifications\n\
+        Some(format!(
+            "{}vc-notify <follow/unfollow> [server-id] - voice channel activity notifications\n\
              |  If messaging in server, [server-id] is derived from context.\n\
              |  If DMing rather than messaging in-server, requires [server-id].\n\
-             |  Right-click on server icon > copy ID to get server-id", prefix))
+             |  Right-click on server icon > copy ID to get server-id",
+            prefix
+        ))
     }
 
     async fn init(&self, ctx: &Context) -> Result<()> {
@@ -61,7 +64,13 @@ impl Plugin for PluginVcNotify {
 
 async fn handle_event(ctx: &Context, msg: &Message) -> Result<EventHandled> {
     let config = ctx.data.read().await;
-    let prefix = &config.get::<RwLock<Config>>().unwrap().read().await.general.command_prefix;
+    let prefix = &config
+        .get::<RwLock<Config>>()
+        .unwrap()
+        .read()
+        .await
+        .general
+        .command_prefix;
     let command_name = format!("{}vc-notify", prefix);
 
     let terms: Vec<&str> = msg.content.split_whitespace().collect();
