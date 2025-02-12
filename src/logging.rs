@@ -1,8 +1,9 @@
 //! Logging to the terminal with colors
 
+use serenity::all::Http;
 use std::borrow::Cow;
 use std::io::IsTerminal;
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 
 const DEFAULT: &str = "\x1b[0m";
 const FG_BLUE: &str = "\x1b[38;5;33m";
@@ -99,7 +100,7 @@ pub trait PrintColor {
 
 #[serenity::async_trait]
 pub trait AsyncPrintColor {
-    async fn color(&self, ctx: &serenity::all::Context) -> String;
+    async fn color(&self, http: &Arc<Http>) -> String;
 }
 
 // Field separator
@@ -124,8 +125,8 @@ impl PrintColor for serenity::all::User {
 
 #[serenity::async_trait]
 impl AsyncPrintColor for serenity::all::UserId {
-    async fn color(&self, ctx: &serenity::all::Context) -> String {
-        let name = match self.to_user(&ctx.http).await {
+    async fn color(&self, http: &Arc<Http>) -> String {
+        let name = match self.to_user(http).await {
             Ok(user) => Cow::Owned(user.name),
             Err(_) => Cow::Borrowed("<unknown-user>"),
         };
@@ -136,9 +137,9 @@ impl AsyncPrintColor for serenity::all::UserId {
 
 #[serenity::async_trait]
 impl AsyncPrintColor for Option<serenity::all::UserId> {
-    async fn color(&self, ctx: &serenity::all::Context) -> String {
+    async fn color(&self, http: &Arc<Http>) -> String {
         let name = match self {
-            Some(user_id) => match user_id.to_user(&ctx).await {
+            Some(user_id) => match user_id.to_user(http).await {
                 Ok(user) => Cow::Owned(user.name),
                 Err(_) => Cow::Borrowed("<unknown-user>"),
             },
@@ -151,9 +152,9 @@ impl AsyncPrintColor for Option<serenity::all::UserId> {
 
 #[serenity::async_trait]
 impl AsyncPrintColor for Option<serenity::all::ChannelId> {
-    async fn color(&self, ctx: &serenity::all::Context) -> String {
+    async fn color(&self, http: &Arc<Http>) -> String {
         let name = match self {
-            Some(channel_id) => match channel_id.name(&ctx.http).await {
+            Some(channel_id) => match channel_id.name(http).await {
                 Ok(name) => Cow::Owned(name),
                 Err(_) => Cow::Borrowed("<unknown-channel>"),
             },
@@ -166,8 +167,8 @@ impl AsyncPrintColor for Option<serenity::all::ChannelId> {
 
 #[serenity::async_trait]
 impl AsyncPrintColor for serenity::all::ChannelId {
-    async fn color(&self, ctx: &serenity::all::Context) -> String {
-        match self.name(&ctx.http).await {
+    async fn color(&self, http: &Arc<Http>) -> String {
+        match self.name(http).await {
             Ok(name) => format!("{}{}{}", Color::Channel, name, Color::Default),
             Err(_) => format!(
                 "{}{}{}",
@@ -181,9 +182,9 @@ impl AsyncPrintColor for serenity::all::ChannelId {
 
 #[serenity::async_trait]
 impl AsyncPrintColor for Option<serenity::all::GuildId> {
-    async fn color(&self, ctx: &serenity::all::Context) -> String {
+    async fn color(&self, http: &Arc<Http>) -> String {
         let name = match self {
-            Some(guild_id) => match guild_id.to_partial_guild(&ctx.http).await {
+            Some(guild_id) => match guild_id.to_partial_guild(http).await {
                 Ok(guild) => Cow::Owned(guild.name),
                 Err(_) => Cow::Borrowed("<unknown-guild>"),
             },

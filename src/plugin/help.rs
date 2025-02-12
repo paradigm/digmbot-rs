@@ -1,24 +1,25 @@
 use crate::{event::*, plugin::*};
 use anyhow::Result;
 
-pub struct PluginHelp;
+pub struct Help;
 
 #[serenity::async_trait]
-impl Plugin for PluginHelp {
+impl Plugin for Help {
     fn name(&self) -> &'static str {
-        "Help"
+        "help"
     }
 
-    async fn usage(&self, _cfg: &RwLock<Config>) -> Option<String> {
-        None
+    async fn usage(&self, ctx: &Context) -> Option<String> {
+        let prefix = &ctx.cfg.read().await.general.command_prefix;
+        Some(format!(
+            "{}{} - show this help message",
+            prefix,
+            self.name()
+        ))
     }
 
-    async fn init(&self, _ctx: &Context) -> Result<()> {
-        Ok(())
-    }
-
-    async fn handle(&self, event: &Event) -> Result<EventHandled> {
-        let Some((ctx, msg)) = event.is_bot_cmd(";help") else {
+    async fn handle(&self, ctx: &Context, event: &Event) -> Result<EventHandled> {
+        let Some((msg, _)) = event.is_bot_cmd(ctx, self.name()).await else {
             return Ok(EventHandled::No);
         };
 
@@ -26,14 +27,14 @@ impl Plugin for PluginHelp {
         reply.push_str("```\n");
         reply.push_str("Commands:\n");
         for plugin in crate::plugin::plugins() {
-            if let Some(usage) = plugin.usage(cfg).await {
+            if let Some(usage) = plugin.usage(ctx).await {
                 reply.push_str(&usage);
                 reply.push('\n');
             }
         }
         reply.push_str("```\n");
 
-        msg.reply(ctx, &reply).await?;
+        msg.reply(ctx.cache_http, &reply).await?;
         Ok(EventHandled::Yes)
     }
 }

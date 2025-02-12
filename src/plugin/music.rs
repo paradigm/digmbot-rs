@@ -1,32 +1,30 @@
-use crate::config::Config;
 use crate::{event::*, plugin::*};
 use anyhow::Result;
-use tokio::sync::RwLock;
 
-pub struct PluginMusic;
+pub struct Music;
 
 #[serenity::async_trait]
-impl Plugin for PluginMusic {
+impl Plugin for Music {
     fn name(&self) -> &'static str {
-        "Music"
+        "music"
     }
 
-    async fn usage(&self, cfg: &RwLock<Config>) -> Option<String> {
-        let prefix = &cfg.read().await.general.command_prefix;
-        Some(format!("{}music - fetch random music from YouTube", prefix))
+    async fn usage(&self, ctx: &Context) -> Option<String> {
+        let prefix = &ctx.cfg.read().await.general.command_prefix;
+        Some(format!(
+            "{}{} - fetch random music from YouTube",
+            prefix,
+            self.name()
+        ))
     }
 
-    async fn init(&self, _ctx: &Context) -> Result<()> {
-        Ok(())
-    }
-
-    async fn handle(&self, event: &Event) -> Result<EventHandled> {
-        let Some((ctx, msg)) = event.is_bot_cmd(";music") else {
+    async fn handle(&self, ctx: &Context, event: &Event) -> Result<EventHandled> {
+        let Some((msg, _)) = event.is_bot_cmd(ctx, self.name()).await else {
             return Ok(EventHandled::No);
         };
 
         const MUSIC_URL: &str = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
-        msg.reply(&ctx, MUSIC_URL).await?;
+        msg.reply(ctx.cache_http, MUSIC_URL).await?;
         Ok(EventHandled::Yes)
     }
 }

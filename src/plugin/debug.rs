@@ -1,75 +1,67 @@
 use crate::{event::*, helper::*, log_event, logging::*, plugin::*};
 use anyhow::Result;
-use serenity::all::Context;
 use std::borrow::Cow;
-use tokio::sync::RwLock;
-use crate::config::Config;
 
 /// Prints debug information about event to stdout
-pub struct PluginDebug;
+pub struct Debug;
 
 #[serenity::async_trait]
-impl Plugin for PluginDebug {
+impl Plugin for Debug {
     fn name(&self) -> &'static str {
-        "Debug"
+        "debug"
     }
 
-    fn usage(&self, _cfg: &RwLock<Config>) -> Option<String> {
+    async fn usage(&self, _ctx: &Context) -> Option<String> {
         None
     }
 
-    async fn init(&self, _ctx: &Context) -> Result<()> {
-        Ok(())
-    }
-
-    async fn handle(&self, event: &Event) -> Result<EventHandled> {
+    async fn handle(&self, ctx: &Context, event: &Event) -> Result<EventHandled> {
         match event {
-            Event::Handler => {}
-            Event::Ready { ctx, ready } => {
+            Event::Ready(ready) => {
                 log_event!(
                     "Connected to {} server(s) as {}",
                     ready.guilds.len(),
                     ctx.cache.current_user().color(),
                 );
             }
-            Event::Message { ctx, msg } => {
+            Event::Message(msg) => {
                 log_event!(
                     "{}{}{}{}{}{} {}",
-                    msg.guild_id.color(ctx).await,
+                    msg.guild_id.color(ctx.http).await,
                     Glue {}.color(),
-                    msg.channel_id.color(ctx).await,
+                    msg.channel_id.color(ctx.http).await,
                     Glue {}.color(),
                     msg.author.color(),
                     Glue {}.color(),
-                    msg.human_format_content(ctx).await,
+                    msg.human_format_content(ctx).await?,
                 );
             }
-            Event::VoiceStateUpdate { ctx, old, new } => match (old, new.channel_id) {
+            Event::VoiceStateUpdate { old, new } => match (old, new.channel_id) {
                 (Some(old), Some(new_id)) if old.channel_id == Some(new_id) => {
                     // State change within same channel, e.g. mute/unmute
                     // Not currently debug logging this
                 }
                 (Some(old), Some(_)) => log_event!(
                     "{} moved VC channel from \"{}\" to \"{}\"",
-                    new.user_id.color(ctx).await,
-                    old.channel_id.color(ctx).await,
-                    new.channel_id.color(ctx).await,
+                    new.user_id.color(ctx.http).await,
+                    old.channel_id.color(ctx.http).await,
+                    new.channel_id.color(ctx.http).await,
                 ),
                 (Some(old), None) => log_event!(
                     "{} left VC channel \"{}\"",
-                    new.user_id.color(ctx).await,
-                    old.channel_id.color(ctx).await,
+                    new.user_id.color(ctx.http).await,
+                    old.channel_id.color(ctx.http).await,
                 ),
                 (None, Some(_)) => log_event!(
                     "{} joined VC channel \"{}\"",
-                    new.user_id.color(ctx).await,
-                    new.channel_id.color(ctx).await,
+                    new.user_id.color(ctx.http).await,
+                    new.channel_id.color(ctx.http).await,
                 ),
                 (None, None) => log_event!("Unknown voice state update"),
             },
-            Event::ReactionAdd { ctx, reaction } => {
-                let message = match reaction.message(ctx).await {
-                    Ok(msg) => Cow::Owned(msg.human_format_content(ctx).await),
+            Event::ReactionAdd(reaction) => {
+                let message = match reaction.message(ctx.http).await {
+                    Ok(msg) => Cow::Owned(msg.human_format_content(ctx).await?),
                     Err(_) => Cow::Borrowed("<unknown-message>"),
                 };
 
@@ -85,14 +77,14 @@ impl Plugin for PluginDebug {
 
                 log_event!(
                     "{} reacted to message \"{}\" with \"{}\"",
-                    reaction.user_id.color(ctx).await,
+                    reaction.user_id.color(ctx.http).await,
                     message,
                     emoji
                 );
             }
-            Event::ReactionRemove { ctx, reaction } => {
+            Event::ReactionRemove(reaction) => {
                 let message = reaction
-                    .message(ctx)
+                    .message(ctx.cache_http)
                     .await
                     .map(|msg| msg.content.clone())
                     .unwrap_or("<unknown-message>".to_string());
@@ -109,7 +101,7 @@ impl Plugin for PluginDebug {
 
                 log_event!(
                     "{} removed reaction \"{}\" from message \"{}\"",
-                    reaction.user_id.color(ctx).await,
+                    reaction.user_id.color(ctx.http).await,
                     emoji,
                     message
                 );

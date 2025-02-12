@@ -1,168 +1,78 @@
-use crate::config::Config;
-use crate::{event::*, helper::*, plugin::*};
+use crate::helper::UserIdHelper;
+use crate::{event::*, plugin::*};
 use anyhow::{anyhow, Result};
-use serenity::{
-    all::{CreateMessage, GuildId, Message, UserId, VoiceState},
-    prelude::TypeMapKey,
-};
-use std::{
-    collections::{HashMap, HashSet},
-    io::ErrorKind,
-    time::{Duration, Instant},
-};
-use tokio::sync::RwLock;
+use serenity::all::{CreateMessage, Message, VoiceState};
+use std::borrow::Cow;
 
-// Maximum rate to notify users. This avoids spam should someone repeatedly join and leave VC.
-const NOTIFY_RATE_LIMIT: Duration = Duration::from_secs(60 * 10);
-
-// Manage subscriptions
-pub struct PluginVcNotify;
-
-enum VcNotifyCmd {
-    Follow,
-    Unfollow,
-}
+pub struct VcNotify;
 
 #[serenity::async_trait]
-impl Plugin for PluginVcNotify {
+impl Plugin for VcNotify {
     fn name(&self) -> &'static str {
-        "VcNotify"
+        "vc-notify"
     }
 
-    async fn usage(&self, cfg: &RwLock<Config>) -> Option<String> {
-        let prefix = &cfg.read().await.general.command_prefix;
+    async fn usage(&self, ctx: &Context) -> Option<String> {
+        let prefix = &ctx.cfg.read().await.general.command_prefix;
         Some(format!(
-            "{}vc-notify <follow/unfollow> [server-id] - voice channel activity notifications\n\
-             |  If messaging in server, [server-id] is derived from context.\n\
-             |  If DMing rather than messaging in-server, requires [server-id].\n\
-             |  Right-click on server icon > copy ID to get server-id",
-            prefix
+            "{}{} <follow/unfollow> - voice channel activity notifications",
+            prefix,
+            self.name(),
         ))
     }
 
-    async fn init(&self, ctx: &Context) -> Result<()> {
-        let state = VcNotifyState {
-            subscribers: VcNotifySubscribers::load().await?,
-            notified_timestamp: HashMap::new(),
-        };
-
-        ctx.data.write().await.insert::<VcNotifyState>(state);
-
-        Ok(())
-    }
-
-    async fn handle(&self, event: &Event) -> Result<EventHandled> {
+    async fn handle(&self, ctx: &Context, event: &Event) -> Result<EventHandled> {
         match event {
-            Event::Message { ctx, msg } => handle_event(ctx, msg).await,
-            Event::VoiceStateUpdate { ctx, old, new } => {
-                handle_voice_state_update(ctx, old, new).await
-            }
+            Event::Message(msg) => handle_message(ctx, msg).await,
+            Event::VoiceStateUpdate { old, new } => handle_voice_state_update(ctx, old, new).await,
             _ => Ok(EventHandled::No),
         }
     }
 }
 
-async fn handle_event(ctx: &Context, msg: &Message) -> Result<EventHandled> {
-    let config = ctx.data.read().await;
-    let prefix = &config
-        .get::<RwLock<Config>>()
-        .unwrap()
-        .read()
-        .await
-        .general
-        .command_prefix;
-    let command_name = format!("{}vc-notify", prefix);
+async fn handle_message(ctx: &Context<'_>, msg: &Message) -> Result<EventHandled> {
+    let cmd_prefix = &ctx.cfg.read().await.general.command_prefix;
 
     let terms: Vec<&str> = msg.content.split_whitespace().collect();
-    if terms.first() != Some(&command_name.as_str()) {
+    if terms.first().and_then(|cmd| cmd.strip_prefix(cmd_prefix)) != Some("vc-notify") {
         return Ok(EventHandled::No);
     }
 
-    let cmd = match terms.get(1) {
-        Some(&"follow") => VcNotifyCmd::Follow,
-        Some(&"unfollow") => VcNotifyCmd::Unfollow,
-        _ => {
-            msg.reply(ctx, "Invalid command.  See `;help`").await?;
-            return Ok(EventHandled::Yes);
+    let id = msg.author.id;
+    let pstate = &mut ctx.pstate.write().await;
+    let followers = &mut pstate.vc_notify.followers;
+    let following = followers.contains(&id);
+
+    let response = match (terms.get(1), following) {
+        (Some(&"follow"), true) => {
+            Cow::Borrowed("You are already subscribed to voice channel activity notifications")
         }
-    };
-
-    let guild_id = match terms.get(2) {
-        Some(id) => match id.parse::<GuildId>() {
-            Ok(id) => id,
-            Err(_) => {
-                msg.reply(ctx, "Invalid `server-id`, see `;help`").await?;
-                return Ok(EventHandled::Yes);
-            }
-        },
-        None => match msg.guild(&ctx.cache).map(|guild| guild.id) {
-            Some(guild_id) => guild_id,
-            None => {
-                msg.reply(ctx, "Missing `server-id`, see `;help`").await?;
-                return Ok(EventHandled::Yes);
-            }
-        },
-    };
-
-    // Sanity check guild_id
-    let guild_name = guild_id
-        .to_guild_cached(&ctx.cache)
-        .map(|guild| guild.name.clone());
-    let guild_name = match guild_name {
-        Some(name) => name,
-        None => {
-            msg.reply(
-                ctx,
-                "I am not in that server, and so I can't help you there.",
+        (Some(&"follow"), false) => {
+            followers.insert(id);
+            pstate.save().await?;
+            Cow::Borrowed(
+                "You have successfully subscribed to voice channel activity notifications",
             )
-            .await?;
-            return Ok(EventHandled::Yes);
         }
+        (Some(&"unfollow"), true) => {
+            followers.remove(&id);
+            pstate.save().await?;
+            Cow::Borrowed(
+                "You have successfully unsubscribed from voice channel activity notifications",
+            )
+        }
+        (Some(&"unfollow"), false) => {
+            Cow::Borrowed("You are not subscribed to voice channel activity notifications")
+        }
+        _ => Cow::Owned(format!("Invalid command.  See `{}help`", cmd_prefix)),
     };
 
-    let mut state = ctx.data.write().await;
-    let state = state
-        .get_mut::<VcNotifyState>()
-        .ok_or(anyhow!("VcNotify uninitialized"))?;
-
-    let result = match cmd {
-        VcNotifyCmd::Follow => {
-            if state.subscribers.follow(guild_id, msg.author.id).await? {
-                msg.reply(ctx, format!(
-                        "You have successfully subscribed to voice channel activity notifications for {} ({})",
-                        guild_name,
-                        guild_id
-                    )).await
-            } else {
-                msg.reply(ctx, format!(
-                        "You are already subscribed to voice channel activity notifications for {} ({})",
-                        guild_name,
-                        guild_id
-                    )).await
-            }
-        }
-        VcNotifyCmd::Unfollow => {
-            if state.subscribers.unfollow(guild_id, msg.author.id).await? {
-                msg.reply(ctx, format!(
-                        "You have successfully unsubscribed from voice channel activity notifications for {} ({})",
-                        guild_name,
-                        guild_id
-                    )).await
-            } else {
-                msg.reply(ctx, format!(
-                        "You are not subscribed to voice channel activity notifications for {} ({})",
-                        guild_name,
-                        guild_id
-                    )).await
-            }
-        }
-    };
-
-    result.map(|_| EventHandled::Yes).map_err(Into::into)
+    msg.reply(ctx.cache_http, response).await?;
+    Ok(EventHandled::Yes)
 }
 
 async fn handle_voice_state_update(
-    ctx: &Context,
+    ctx: &Context<'_>,
     old: &Option<VoiceState>,
     new: &VoiceState,
 ) -> Result<EventHandled> {
@@ -199,121 +109,54 @@ async fn handle_voice_state_update(
         if Some(channel_id) == afk_channel_id {
             continue;
         }
-        voice_user_count += channel.members(ctx)?.len();
+        voice_user_count += channel.members(ctx.cache_http)?.len();
     }
 
     // Already users in VC
-    if voice_user_count != 1 {
+    if voice_user_count > 1 {
         return Ok(EventHandled::No);
     }
 
     // Notify registered users
-    let state = ctx.data.read().await;
-    let state = state
-        .get::<VcNotifyState>()
-        .ok_or(anyhow!("VcNotify state uninitialized"))?;
-    let subscribers = state.subscribers.get_subscribers(&guild_id);
+    let pstate = &ctx.pstate.write().await;
+    let followers = &pstate.vc_notify.followers;
+
     let channel_name = new
         .channel_id
         .map(|id| format!("<#{}>", id))
         .unwrap_or("a VC channel".to_string());
 
-    let new_user_name = new.user_id.name(ctx).await;
+    let cmd_prefix = &ctx.cfg.read().await.general.command_prefix;
+    let new_user_name = new.user_id.nick_in_guild(ctx, Some(guild_id)).await;
     let message = CreateMessage::new().content(format!(
         "{} joined VC channel {} in {}\n\
             \n\
-            You can opt out of these notifications by replying `{}vc-notify unfollow {}`\n",
-        new_user_name, channel_name, guild.name, prefix, guild.id
+            You can opt out of these notifications by replying `{}vc-notify unfollow`\n",
+        new_user_name, channel_name, guild.name, cmd_prefix
     ));
 
-    let now = std::time::Instant::now();
-    for subscriber_id in subscribers.into_iter() {
+    let timestamps = &mut ctx.vstate.write().await.notify_timestamp;
+
+    for follower_id in followers.iter() {
         // Don't DM the user who just joined
-        if subscriber_id == new.user_id {
+        if *follower_id == new.user_id {
             continue;
         }
         // Don't DM the user too often
-        if let Some(last) = state.notified_timestamp.get(&subscriber_id) {
-            if now.duration_since(*last) < NOTIFY_RATE_LIMIT {
-                continue;
-            }
+        if !timestamps.okay_to_notify(ctx, *follower_id).await {
+            continue;
         }
 
-        subscriber_id
+        timestamps.update_notify_timestamp(*follower_id).await;
+
+        follower_id
             .to_user(&ctx.http)
             .await?
-            .direct_message(ctx, message.clone())
+            .direct_message(ctx.cache_http, message.clone())
             .await?;
     }
 
     // While we handled the event, we did not do so exclusively; other plugins might also want
     // to act on this event.
     Ok(EventHandled::No)
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
-struct VcNotifySubscribers(HashMap<GuildId, HashSet<UserId>>);
-
-struct VcNotifyState {
-    subscribers: VcNotifySubscribers,
-    notified_timestamp: HashMap<UserId, Instant>,
-}
-
-// Serenity crate system to support this type in the Serenity Context
-impl TypeMapKey for VcNotifyState {
-    type Value = VcNotifyState;
-}
-
-impl VcNotifySubscribers {
-    async fn save(&self) -> Result<()> {
-        let serialized = serde_json::to_string(self)
-            .map_err(|e| anyhow!("Failed to serialize VcNotify subscribers: {}", e))?;
-
-        config_path("vc_notify.json")?
-            .write(&serialized)
-            .await
-            .map(|_| ())
-            .map_err(|e| anyhow!("Failed to write VcNotify subscribers: {}", e))
-    }
-
-    async fn load() -> Result<Self> {
-        let subscribers = match config_path("vc_notify.json")?.read_to_bytes().await {
-            Ok(data) => serde_json::from_slice(&data)
-                .map_err(|e| anyhow!("Failed to deserialize VcNotify: {}", e))?,
-            Err(e) if e.kind() == ErrorKind::NotFound => HashMap::new(),
-            Err(e) => return Err(anyhow!("Failed to read vc_notify.json: {}", e)),
-        };
-        Ok(Self(subscribers))
-    }
-
-    async fn follow(&mut self, guild_id: GuildId, user_id: UserId) -> Result<bool> {
-        let made_change = self.0.entry(guild_id).or_default().insert(user_id);
-
-        if made_change {
-            self.save().await?;
-        }
-
-        Ok(made_change)
-    }
-
-    async fn unfollow(&mut self, guild_id: GuildId, user_id: UserId) -> Result<bool> {
-        let Some(guild_entry) = self.0.get_mut(&guild_id) else {
-            return Ok(false);
-        };
-
-        let made_change = guild_entry.remove(&user_id);
-
-        if made_change {
-            self.save().await?;
-        }
-
-        Ok(made_change)
-    }
-
-    fn get_subscribers(&self, guild_id: &GuildId) -> Vec<UserId> {
-        self.0
-            .get(guild_id)
-            .map(|s| s.iter().cloned().collect())
-            .unwrap_or_default()
-    }
 }
