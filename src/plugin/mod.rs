@@ -10,6 +10,7 @@ mod history;
 mod ignore_bots;
 mod llm_reply;
 mod music;
+mod react;
 mod reload;
 mod rivals_rating;
 mod vc_notify;
@@ -47,8 +48,9 @@ pub fn plugins() -> Vec<Box<dyn Plugin>> {
         Box::new(reload::Reload),
         Box::new(vc_notify::VcNotify),
         Box::new(rivals_rating::RivalsRating),
-        // LLM fallback, used if no other plugin handles the event.
+        // Generic responses, used if no other plugin handles the event.
         // Keep last.
         Box::new(llm_reply::LlmReply),
+        Box::new(react::React),
     ]
 }
